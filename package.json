@@ -1,11 +1,12 @@
 {
-  "name": "cloury-market",
+  "name": "cloudy-market",
   "version": "1.0.1",
   "description": "",
   "main": "index.js",
   "scripts": {
     "build": "tsc",
-    "create-table": "ts-node --project tsconfig-pump.json scripts/create-tables.ts",
+    "create-tables": "ts-node --project tsconfig-pump.json scripts/create-tables.ts",
+    "empty-result": "ts-node --project tsconfig-pump.json scripts/empty-result.ts",
     "create-order": "curl -X POST -H 'Content-Type: application/json' -d @scripts/order-created.json https://d5d8nis41336bq4vuh62.y1haggxy.apigw.yandexcloud.net/notification",
     "processing-started": "curl -X POST -H 'Content-Type: application/json' -d @scripts/processing-started.json https://d5d8nis41336bq4vuh62.y1haggxy.apigw.yandexcloud.net/notification",
     "deploy": "tsc && scripts/deploy.sh"

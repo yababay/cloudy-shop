@@ -1,7 +1,7 @@
 import { YC } from './src/lib/yc.js'
 import { getOrder, sendProcessingStartedMessage, sendOrderCreatedMessage, sendMessage } from './src/lib/server/index.js'
-import { getDriver } from './src/lib/server/ydb/driver-cjs.js'
-import { getYDBTimestamp } from './src/lib/util.js'
+import { getDriver } from './src/lib/server/db/driver-cjs.js'
+import { checkFulfillness, getYDBTimestamp, intFromResultSets } from './src/lib/server/db/util.js'
 import { Order } from './src/lib/index.js'
 
 const reply = {
@@ -25,7 +25,7 @@ export async function handler(event: YC.CloudFunctionsHttpEvent, context: YC.Clo
         let payload = context.getPayload()
         if(!(payload && typeof payload === 'object')) throw 'no object in payload'
 
-        const { status, substatus, orderId, campaignId, createdAt, updatedAt, notificationType } = payload as Order
+        const { status, substatus, orderId, campaignId, notificationType } = payload as Order
 
         if(notificationType === 'ORDER_CREATED') {
             await sendOrderCreatedMessage(orderId)
@@ -35,23 +35,26 @@ export async function handler(event: YC.CloudFunctionsHttpEvent, context: YC.Clo
         if(status === 'PROCESSING' && substatus === 'STARTED'){
 
             const { order } = await getOrder(campaignId, orderId)
-            const driver = await getDriver()
-            const query = `insert into ordered_items (item_id, order_id, campaign_id, offer_id, count, created_at) values`
-            
+
+            const query = `upsert into ordered_items (item_id, order_id, campaign_id, offer_id, amount, created_at) values`
             const { items } = order
             const values = new Array<string>()
+
             for(const { id, offerId, count } of items) {
                 const value = ` (${id}, ${orderId}, ${campaignId}, '${offerId}', ${count},  ${getYDBTimestamp()})`
                 values.push(value)
             }
 
+            const driver = await getDriver()
+
             await driver.tableClient.withSession(async (session) => {
                 await session.executeQuery(`${query} ${values.join(', ')}`)
+                const [sum, count] = await checkFulfillness(session, order)
+                await sendProcessingStartedMessage(order, sum, count)
             })
 
             await driver.destroy()
 
-            await sendProcessingStartedMessage(order)
             return reply
         }
 

@@ -9,10 +9,10 @@ export type Item = {
 }
 
 export type Order = {
-    notificationType: NotificationType
-    id?: number
     orderId: number
-    campaignId: number
+    campaignId?: number
+    notificationType?: NotificationType
+    id?: number
     items?: Item[]
     status?: OrderStatus
     substatus?: OrderSubtatus

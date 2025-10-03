@@ -23,13 +23,16 @@ export const sendMessage = async (message: string) => {
 }
 
 export const sendOrderCreatedMessage = async (orderId: number) => {
-    let message = `🆗 От Маркета получен заказ № ${orderId}.`
+    let message = `🆗 От Маркета получен заказ № ${orderId}.`
     await sendMessage(message)
 }
 
-export const sendProcessingStartedMessage = async (order: Order) => {
+export const sendProcessingStartedMessage = async (order: Order, sum: number, count: number) => {
     const { id, items } = order
     const basket = (items || []).map(({offerId, count}) => `${offerId} (${count})`).join(', ')
-    let message = `⏱️ Заказ № ${id} принят в обработку. Состав: ${basket}.`
+    let message = `⏱️ Состав заказа № ${id}: ${basket}.`
+    const lack = sum - count
+    if(!lack) message += ` Заказ обеспечен кодами и будет обработан автоматически.`
+    else message += ` Заполнено кодов: ${count} из ${sum}. Перейдите к [боту 🤖](https://t.me/activation_service_bot), чтобы добавить.`
     await sendMessage(message)
 }
