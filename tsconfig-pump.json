@@ -1,0 +1,14 @@
+{
+  "compilerOptions":
+  {
+    "target": "ESNext",
+    "module": "commonjs",
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "outDir": ".pump",
+    "sourceMap": true,
+    "removeComments": true
+  },
+  "include": [ "scripts/*.ts", "src/**/*.ts" ],
+  "exclude": [ "node_modules" ],
+}

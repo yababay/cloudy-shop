@@ -1,0 +1,12 @@
+{
+    "notificationType": "ORDER_CREATED",
+    "orderId": 49392010241,
+    "campaignId": 110987348,
+    "items": [
+        {
+            "offerId": "APPLE500",
+            "count": 1
+        }
+    ],
+    "createdAt": "2025-10-02T17:50:17.714Z"
+}

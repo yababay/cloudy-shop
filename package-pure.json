@@ -1,0 +1,13 @@
+{
+  "name": "random-history-messenger",
+  "version": "1.0.1",
+  "main": "index.js",
+  "type": "module",
+  "dependencies": {
+    "@yandex-cloud/nodejs-sdk": "^2.9.0",
+    "axios": "^1.12.2",
+    "telegraf": "^4.16.3",
+    "dotenv": "^16.0.0",
+    "ydb-sdk": "^5.11.1"
+  }
+}

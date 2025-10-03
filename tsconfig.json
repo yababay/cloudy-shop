@@ -1,0 +1,16 @@
+{
+  "compilerOptions":
+  {
+    "moduleResolution": "node",
+    "module": "es2022",
+    "target": "es2022",
+    "allowJs": true,
+    "esModuleInterop": true,
+    "outDir": "dist",
+    "sourceMap": true,
+    "skipLibCheck": true,
+    "removeComments": true
+  },
+  "include": [ "src/**/*.ts", "src/lib/yc.d.ts", "index.ts" ],
+  "exclude": [ "node_modules", "scripts" ]
+}

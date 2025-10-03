@@ -1,0 +1,101 @@
+{
+    "order": {
+      "id": 49398136513,
+      "externalOrderId": "49398136513",
+      "status": "PROCESSING",
+      "substatus": "STARTED",
+      "creationDate": "03-10-2025 01:01:06",
+      "updatedAt": "03-10-2025 01:01:19",
+      "currency": "RUR",
+      "itemsTotal": 2307,
+      "deliveryTotal": 0,
+      "buyerItemsTotal": 2307,
+      "buyerTotal": 2307,
+      "buyerItemsTotalBeforeDiscount": 2307,
+      "buyerTotalBeforeDiscount": 2307,
+      "paymentType": "PREPAID",
+      "paymentMethod": "YANDEX",
+      "fake": true,
+      "items": [
+        {
+          "id": 960980048,
+          "offerId": "APPLE500",
+          "offerName": "Подарочная карта Apple App Store номиналом 500 рублей для любых цифровых покупок",
+          "price": 769,
+          "buyerPrice": 769,
+          "buyerPriceBeforeDiscount": 769,
+          "priceBeforeDiscount": 769,
+          "count": 3,
+          "vat": "NO_VAT",
+          "shopSku": "APPLE500"
+        }
+      ],
+      "delivery": {
+        "type": "DIGITAL",
+        "serviceName": "Цифровая доставка",
+        "deliveryPartnerType": "SHOP",
+        "dates": {
+          "fromDate": "02-10-2025",
+          "toDate": "02-10-2025",
+          "fromTime": "00:00:00",
+          "toTime": "00:00:00"
+        },
+        "region": {
+          "id": 35,
+          "name": "Краснодар",
+          "type": "CITY",
+          "parent": {
+            "id": 121158,
+            "name": "Городской округ Краснодар",
+            "type": "REPUBLIC_AREA",
+            "parent": {
+              "id": 10995,
+              "name": "Краснодарский край",
+              "type": "REPUBLIC",
+              "parent": {
+                "id": 26,
+                "name": "Южный федеральный округ",
+                "type": "COUNTRY_DISTRICT",
+                "parent": {
+                  "id": 225,
+                  "name": "Россия",
+                  "type": "COUNTRY"
+                }
+              }
+            }
+          }
+        },
+        "address": {
+          "country": "Россия",
+          "postcode": "350047",
+          "city": "Краснодар",
+          "street": "Льва Толстого",
+          "house": "3",
+          "block": "1",
+          "apartment": "1",
+          "gps": {
+            "latitude": 45.065335,
+            "longitude": 38.93788
+          }
+        },
+        "deliveryServiceId": 99,
+        "liftPrice": 0,
+        "dispatchType": "BUYER",
+        "shipments": [
+          {
+            "id": 766676161,
+            "shipmentDate": "04-10-2025"
+          }
+        ]
+      },
+      "buyer": {
+        "id": "862f901902a1409e832605fdf9052889",
+        "lastName": "Беляков",
+        "firstName": "Михаил",
+        "email": "noreply-market@support.yandex.ru",
+        "type": "PERSON"
+      },
+      "taxSystem": "OSN",
+      "cancelRequested": false
+    }
+  }
