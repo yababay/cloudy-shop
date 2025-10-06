@@ -1,7 +1,7 @@
 import { YC } from './src/lib/yc.js'
 import { getOrder, sendProcessingStartedMessage, sendOrderCreatedMessage, sendMessage } from './src/lib/server/index.js'
 import { getDriver } from './src/lib/server/db/driver-cjs.js'
-import { checkFulfillness, getYDBTimestamp, intFromResultSets } from './src/lib/server/db/util.js'
+import { getYDBTimestamp, intFromQuery, isEmpty, rowsFromResultSets, stringFromRows } from './src/lib/server/db/util.js'
 import { Order } from './src/lib/index.js'
 
 const reply = {
@@ -49,7 +49,31 @@ export async function handler(event: YC.CloudFunctionsHttpEvent, context: YC.Clo
 
             await driver.tableClient.withSession(async (session) => {
                 await session.executeQuery(`${query} ${values.join(', ')}`)
-                const [sum, count] = await checkFulfillness(session, order)
+
+                const offers = items.reduce((acc, { offerId, count }) => {
+                    const arr = new Array<string>(count).fill(offerId)
+                    return [ ...acc, ...arr ]
+                }, new Array<string>())
+                  
+                const ts = getYDBTimestamp()
+                const failed = new Set<string>()
+                
+                let count = 0
+                
+                for(const offer of offers) {
+                      if(failed.has(offer)) continue
+                      const result = await session.executeQuery(`select code from codes where offer_id = '${offer}' and order_id is null limit 1`)
+                      if(isEmpty(result)){
+                        failed.add(offer)
+                        continue
+                      }
+                      count++
+                      const rows = rowsFromResultSets(result)
+                      let code = stringFromRows(rows) 
+                      await session.executeQuery(`update codes set order_id = ${orderId}, updated_at = ${ts} where code = '${code}'`)
+                }
+                
+                const sum = await intFromQuery(session, `select sum(amount) from ordered_items where order_id = ${orderId}`)
                 await sendProcessingStartedMessage(order, sum, count)
             })
 
@@ -66,7 +90,8 @@ export async function handler(event: YC.CloudFunctionsHttpEvent, context: YC.Clo
         await sendMessage(body)
         return {
             statusCode: 500,
-            body: `500: ${err}`
+            body
         };
     }
 }
+

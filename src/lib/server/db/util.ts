@@ -1,19 +1,53 @@
 import  YDB from 'ydb-sdk'
-import { Order } from '../../types/index.js'
 
-export const getYDBTimestamp = (date: Date = new Date()) => `Datetime("${date.toISOString().slice(0, -5)}Z")`
+export const stringsFromQuery = async (session: YDB.TableSession, query: string): Promise<string[]> => {
+    const result = await session.executeQuery(query)
+    const rows = rowsFromResultSets(result)
+    const values = stringFromRows(rows, true)
+    if(Array.isArray(values)) return values
+    throw 'only arrays here'
+}
 
-export const intFromResultSets = (result: YDB.Ydb.Table.ExecuteQueryResult): number | number[] => {
+export const stringFromQuery = async (session: YDB.TableSession, query: string): Promise<string> => {
+    const result = await session.executeQuery(query)
+    const rows = rowsFromResultSets(result)
+    const value = stringFromRows(rows, false)
+    if(Array.isArray(value)) throw 'no arrays here'
+    return value
+}
+
+export const intsFromQuery = async (session: YDB.TableSession, query: string): Promise<number[]> => {
+    const result = await session.executeQuery(query)
+    const rows = rowsFromResultSets(result)
+    const values = intFromRows(rows, true)
+    if(Array.isArray(values)) return values
+    throw 'only arrays here'
+}
+
+export const intFromQuery = async (session: YDB.TableSession, query: string): Promise<number> => {
+    const result = await session.executeQuery(query)
+    const rows = rowsFromResultSets(result)
+    const value = intFromRows(rows, false)
+    if(Array.isArray(value)) throw 'no arrays here'
+    return value
+}
+
+export const rowsFromResultSets = (result: YDB.Ydb.Table.ExecuteQueryResult) => {
     const { resultSets } = result
     const [ resultSet ]  = resultSets
     const { rows } = resultSet
     if(!Array.isArray(rows)) throw 'bad rows'
-    const [ row ] = rows
-    const { items } = row
-    if(!Array.isArray(items)) throw 'bad items'
-    const values = items.map(({ int32Value, int64Value }) => +(int32Value || int64Value))
-    const [ value ] = values
-    return values.length > 1 ? values : value
+    return rows
+}
+
+export const intFromItem = (item: YDB.Ydb.IValue): number => {
+    const { int32Value, int64Value } = item
+    return +(int32Value || int64Value)
+}
+
+export const stringFromItem = (item: YDB.Ydb.IValue): string => {
+    const { textValue } = item
+    return textValue
 }
 
 export const isEmpty = (result: YDB.Ydb.Table.ExecuteQueryResult): boolean => {
@@ -23,61 +57,16 @@ export const isEmpty = (result: YDB.Ydb.Table.ExecuteQueryResult): boolean => {
   return !rows.length
 }
 
-export const stringFromResultSets = (result: YDB.Ydb.Table.ExecuteQueryResult): string | string[] => {
-  const { resultSets } = result
-  const [ resultSet ]  = resultSets
-  const { rows } = resultSet
-  if(!Array.isArray(rows)) throw 'bad rows'
-  const [ row ] = rows
-  const { items } = row
-  if(!Array.isArray(items)) throw 'bad items'
-  const values = items.map(({ textValue }) => textValue)
+export const getYDBTimestamp = (date: Date = new Date()) => `Datetime("${date.toISOString().slice(0, -5)}Z")`
+
+export const intFromRows = (rows: YDB.Ydb.IValue[], forceArray = false): number | number[] => {
+  const values = rows.map(({ items }) => intFromItem(items[0]))
   const [ value ] = values
-  return values.length > 1 ? values : value
+  return values.length > 1 || forceArray ? values : value
 }
 
-export const checkFulfillness = async (session: YDB.TableSession, order: Order) => {
-
-  const { items, id } = order
-  let result = await session.executeQuery(`select sum(amount) from ordered_items where order_id = ${id}`)
-  const sum = intFromResultSets(result)
- 
-  const offers = items.reduce((acc, { offerId, count }) => {
-    const arr = new Array<string>(count).fill(offerId)
-    return [ ...acc, ...arr ]
-  }, new Array<string>())
-  
-  const ts = getYDBTimestamp()
-  const failed = new Set<string>()
-
-  let count = 0
-
-  for(const offer of offers) {
-      if(failed.has(offer)) continue
-      result = await session.executeQuery(`select code from codes where offer_id = '${offer}' and order_id is null limit 1`)
-      if(isEmpty(result)){
-        failed.add(offer)
-        continue
-      }
-      count++
-      let code = stringFromResultSets(result) 
-      if(Array.isArray(code))  throw 'no arrays here'
-      console.log('code =', code, 'count =', count)
-      await session.executeQuery(`update codes set order_id = ${id}, updated_at = ${ts} where code = '${code}'`)
-  }
-
-  /*
-  const count = await new Promise<string>((yep) => setTimeout(() => yep(`select count(*) from codes where order_id = ${id}`), 500))
-      .then(query => session.executeQuery(query))
-      .then(result => intFromResultSets(result))
-  {
-
-    result = await session.executeQuery(`select count(*) from codes where order_id = ${id}`)
-    const count = intFromResultSets(result)
-    console.log('count =', count, 'item =', JSON.stringify(result))
-  })*/
-
-  if(Array.isArray(sum) || Array.isArray(count)) throw 'no arrays here'
-
-  return [sum, count]
+export const stringFromRows = (rows: YDB.Ydb.IValue[], forceArray = false): string | string[] => {
+  const values = rows.map(({ items }) => stringFromItem(items[0]))
+  const [ value ] = values
+  return values.length > 1 || forceArray ? values : value
 }

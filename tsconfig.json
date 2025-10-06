@@ -11,6 +11,6 @@
     "skipLibCheck": true,
     "removeComments": true
   },
-  "include": [ "src/**/*.ts", "src/lib/yc.d.ts", "index.ts" ],
+  "include": [ "src/**/*.ts", "src/lib/yc.d.ts", "notification.ts", "telegram.ts" ],
   "exclude": [ "node_modules", "scripts" ]
 }
