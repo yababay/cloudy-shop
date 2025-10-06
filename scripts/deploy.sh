@@ -35,5 +35,5 @@ function upload {
 #      --function-id="$YC_FUNCTION_ID" \
 }
 
-# upload notification
+#upload notification
 upload telegram

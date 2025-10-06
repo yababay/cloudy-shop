@@ -1,10 +1,11 @@
+import YDB from 'ydb-sdk'
 import { YC } from './src/lib/yc.js'
 import { Telegram, Context, Markup } from 'telegraf'
 import { Update, UserFromGetMe } from 'telegraf/types'
 import { Deunionize } from 'telegraf/typings/core/helpers/deunionize.js'
 import { getDriver } from './src/lib/server/db/driver-cjs.js'
-import { getCodes, getUnfilled } from './src/lib/server/db/fulfill.js'
-import { getYDBTimestamp, isEmpty, rowsFromResultSets, stringFromItem, stringsFromQuery } from './src/lib/server/db/util.js'
+import { getCodes, getUnfilled, lackOfCodes } from './src/lib/server/db/fulfill.js'
+import { getYDBTimestamp, intFromItem, intFromRows, isEmpty, rowsFromResultSets, stringFromItem, stringsFromQuery } from './src/lib/server/db/util.js'
 
 const { TELEGRAM_BOT_TOKEN, TELEGRAM_CHANNEL } = process.env
 
@@ -29,10 +30,19 @@ export async function handler (event: YC.CloudFunctionsHttpEvent, context: YC.Cl
     const ctx = new Context(payload, TG, BOT_INFO)
 
     const { text } = ctx
+    const data = ctx.callbackQuery?.['data']
 
     const driver = await getDriver()
 
+    
     await driver.tableClient.withSession(async (session) => {
+
+
+        if(data) {
+            const message = await lackOfCodes(session, data)
+            return await ctx.reply(message, {parse_mode: 'HTML'})
+        }
+
 
         if(text.startsWith('/delete')){
             const [ _, code] = text.split(/\s+/)
@@ -48,19 +58,27 @@ export async function handler (event: YC.CloudFunctionsHttpEvent, context: YC.Cl
 
             case '/start':
                 return await ctx.reply('🤖 Этот бот помогает заполнять коды для цифровых товаров компании Activation Service.\n\nВведите `/`, чтобы увидеть список доступных команд.', {parse_mode: 'Markdown'})
+                
             case '/help':
                 return await ctx.reply('📖 Пользуйтесь командами (`/check`, `/codes` и др.) или вводите коды активации построчно, например `APPLE500 qwerty12345`.', {parse_mode: 'Markdown'})
+
             case '/codes':
                 const rows = await getCodes(session)
                 if(!rows.length) return await ctx.reply(`🤔 Коды еще не добавлены…`)
                 return await ctx.reply(rows.join('\n\n'), {parse_mode: 'HTML'})
+
             case '/check':
                 const ids = await getUnfilled(session)
-                if(!ids.length) await ctx.reply('🎉 Незаполненных заказов не обнаружено.')
-                else await ctx.reply(`⏱️ Недостаточно кодов для ${ids.length === 1 ? 'заказа' : 'заказов'}:`, Markup.inlineKeyboard(
+                if(!ids.length) return await ctx.reply('🎉 Незаполненных заказов не обнаружено.')
+                if(ids.length === 1){
+                    const [ id ] = ids
+                    const message = await lackOfCodes(session, id)
+                    return await ctx.reply(message, {parse_mode: 'HTML'})
+                }
+                else return await ctx.reply(`⏱️ Недостаточно кодов для ${ids.length === 1 ? 'заказа' : 'заказов'}:`, Markup.inlineKeyboard(
                     ids.map(id => [`№ ${id}`, id + '']).map(([title, num]) => Markup.button.callback(title, num))
                 ))
-                return
+
             default:
 
                 const offers = await stringsFromQuery(session, `select id from offers`)
