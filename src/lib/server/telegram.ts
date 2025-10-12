@@ -27,6 +27,11 @@ export const sendOrderCreatedMessage = async (orderId: number) => {
     await sendMessage(message)
 }
 
+export const sendOrderDeliveredMessage = async (orderId: number) => {
+    let message = `🏁 Заказ № ${orderId} доставлен получателю.`
+    await sendMessage(message)
+}
+
 export const sendProcessingStartedMessage = async (order: Order, sum: number, count: number) => {
     const { id, items } = order
     const basket = (items || []).map(({offerId, count}) => `${offerId} (${count})`).join(', ')

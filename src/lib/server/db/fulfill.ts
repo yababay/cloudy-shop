@@ -33,6 +33,8 @@ export const lackOfCodes = async (session: YDB.TableSession, orderId: string | n
 
     offers = offers.filter(([_, __, lack]) => +lack > 0)
 
+    if(!offers.length) return `🎉 Заказ № ${orderId} обеспечен кодами полностью.`
+
     return `В заказе № ${orderId} не заполнены коды для товаров: ${offers.map(([offer, amount, lack]) => `<code>${offer}</code> (${lack}/${amount})`).join(', ')}.`
 }
 
@@ -71,23 +73,40 @@ export const getCodes = async (session: YDB.TableSession) => {
 }
 
 export const getFulfillness = async (session: YDB.TableSession, orderId: number): Promise<{ sum: number, count: number}> => {
-    const sum = await intFromQuery(session, `select sum(amount) from ordered_items where order_id = ${orderId}`)
-    const count = await intFromQuery(session, `select count(*) from codes where order_id = ${orderId}`)
+    const sumQuery = `select sum(amount) from ordered_items where order_id = ${orderId}`
+    const countQuery = `select count(*) from codes where order_id = ${orderId}`
+    const both = await session.executeQuery(sumQuery + ';' + countQuery)
+    const { resultSets } = both
+    const rows = resultSets.map(rs => {
+        const { rows } = rs
+        const [ row ] = rows
+        const { items } = row
+        const [ item ] = items
+        const { uint64Value, int64Value } = item
+        const value = uint64Value || int64Value
+        if(typeof value === 'number') throw 'no number here'
+        const { low } = value
+        return  low
+    })
+    const [ sum, count ] = rows
+    //console.log('both', rows)
+    //const sum = await intFromQuery(session, sumQuery)
+    //const count = await intFromQuery(session, countQuery)
     return { sum, count }
 }
 
-export const getUnfilled = async (session: YDB.TableSession): Promise<number[]> => {
+export const getUnclosed = async (session: YDB.TableSession, ff = false): Promise<number[]> => {
     const unclosed = await intsFromQuery(session, "select distinct order_id from ordered_items where fulfilled_at is null")
-    const unfilled = new Array<number>()
+    const fulfilled = new Array<number>()
     for(const id of unclosed){
         const { sum, count } = await getFulfillness(session, id)
-        if(count < sum) unfilled.push(id)
+        if(count === sum) fulfilled.push(id)
     }
-    return unfilled
+    return ff ? fulfilled : unclosed.filter(id => !fulfilled.includes(id))
 }
 
-export const restoreItems = async (session: YDB.TableSession, orderId: number): Promise<Item[]> => {
-    const result = await session.executeQuery(`select id, offer, count from ordered_items where order_id = ${orderId}`) 
+export const restoreItems = async (session: YDB.TableSession, orderId: number | string): Promise<Item[]> => {
+    const result = await session.executeQuery(`select item_id, offer_id, amount from ordered_items where order_id = ${orderId}`) 
     const rows = rowsFromResultSets(result)
     return rows.map(({items}) => {
         const [idItem, offerItem, countItem] = items
@@ -97,44 +116,3 @@ export const restoreItems = async (session: YDB.TableSession, orderId: number): 
         return { id, offerId, count }
     })
 }
-
-/*
-export const fulfillItem = async (session: YDB.TableSession, id: number) => {
-    const result = await session.executeQuery(`select count from ordered_items` )
-}
-
-export const fulfillOrder = async (session: YDB.TableSession, order: Order) => {
-
-  const { items, id } = order
-  let result = await session.executeQuery(`select sum(amount) from ordered_items where order_id = ${id}`)
-  const sum = intFromResultSets(result)
- 
-  const offers = items.reduce((acc, { offerId, count }) => {
-    const arr = new Array<string>(count).fill(offerId)
-    return [ ...acc, ...arr ]
-  }, new Array<string>())
-  
-  const ts = getYDBTimestamp()
-  const failed = new Set<string>()
-
-  let count = 0
-
-  for(const offer of offers) {
-      if(failed.has(offer)) continue
-      result = await session.executeQuery(`select code from codes where offer_id = '${offer}' and order_id is null limit 1`)
-      if(isEmpty(result)){
-        failed.add(offer)
-        continue
-      }
-      count++
-      let code = stringFromResultSets(result) 
-      if(Array.isArray(code))  throw 'no arrays here'
-      console.log('code =', code, 'count =', count)
-      await session.executeQuery(`update codes set order_id = ${id}, updated_at = ${ts} where code = '${code}'`)
-  }
-
-  if(Array.isArray(sum) || Array.isArray(count)) throw 'no arrays here'
-
-  return [sum, count]
-}
-*/

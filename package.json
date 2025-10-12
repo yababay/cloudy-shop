@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsc",
     "create-tables": "ts-node --project tsconfig-pump.json scripts/create-tables.ts",
+    "queries": "ts-node --project tsconfig-pump.json scripts/queries.ts",
     "empty-result": "ts-node --project tsconfig-pump.json scripts/empty-result.ts",
     "create-order": "curl -X POST -H 'Content-Type: application/json' -d @scripts/order-created.json https://d5d8nis41336bq4vuh62.y1haggxy.apigw.yandexcloud.net/notification",
     "processing-started": "curl -X POST -H 'Content-Type: application/json' -d @scripts/processing-started.json https://d5d8nis41336bq4vuh62.y1haggxy.apigw.yandexcloud.net/notification",
@@ -31,6 +32,7 @@
     "@yandex-cloud/nodejs-sdk": "^2.9.0",
     "axios": "^1.12.2",
     "dotenv": "^16.0.0",
+    "showdown": "^2.1.0",
     "telegraf": "^4.16.3",
     "ydb-sdk": "^5.11.1"
   }

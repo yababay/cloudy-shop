@@ -1,9 +1,12 @@
 import { YC } from './src/lib/yc.js'
-import { getOrder, sendProcessingStartedMessage, sendOrderCreatedMessage, sendMessage } from './src/lib/server/index.js'
+import { getOrder, sendProcessingStartedMessage, sendOrderCreatedMessage, sendMessage, sendOrderDeliveredMessage } from './src/lib/server/index.js'
 import { getDriver } from './src/lib/server/db/driver-cjs.js'
 import { getYDBTimestamp, intFromQuery } from './src/lib/server/db/util.js'
 import { Order } from './src/lib/index.js'
 import { fulfillItem } from './src/lib/server/db/fulfill.js'
+import showdown from 'showdown'
+
+const converter = new showdown.Converter()
 
 const reply = {
     statusCode: 200,
@@ -30,6 +33,22 @@ export async function handler(event: YC.CloudFunctionsHttpEvent, context: YC.Clo
 
         if(notificationType === 'ORDER_CREATED') {
             await sendOrderCreatedMessage(orderId)
+            return reply
+        }
+
+        
+        if(status === 'DELIVERED'){
+
+            const driver = await getDriver()
+
+            await driver.tableClient.withSession(async (session) => {
+                await session.executeQuery(`update ordered_items set delivered_at = ${getYDBTimestamp()} where order_id = ${orderId}`)
+            })
+
+            await driver.destroy()
+
+            await sendOrderDeliveredMessage(orderId)
+            
             return reply
         }
 
@@ -62,10 +81,12 @@ export async function handler(event: YC.CloudFunctionsHttpEvent, context: YC.Clo
                 await sendProcessingStartedMessage(order, sum, count)
             })
 
+            
             await driver.destroy()
-
             return reply
+
         }
+        
 
         return reply
 
