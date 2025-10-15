@@ -1,0 +1,1 @@
+{"root":["./.svelte-kit/ambient.d.ts","./.svelte-kit/non-ambient.d.ts","./.svelte-kit/types/src/routes/$types.d.ts","./vite.config.ts","./src/app.d.ts","./src/lib/index.ts","./src/lib/server/index.ts","./src/lib/server/net.ts","./src/lib/server/ydb/driver.test.ts","./src/lib/server/ydb/driver.ts","./src/lib/server/ydb/index.ts"],"version":"5.9.3"}

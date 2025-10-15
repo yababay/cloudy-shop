@@ -1,0 +1,8 @@
+{
+	"type": "module",
+	"dependencies": {
+		"axios": "^1.12.2",
+		"dotenv": "^17.2.3",
+		"ydb-sdk": "^5.11.1"
+	}
+}
