@@ -1,4 +1,4 @@
-import YDB from 'ydb-sdk'
+import { TokenAuthService, Driver } from 'ydb-sdk'
 import axios from 'axios'
 import dotenv from 'dotenv'
 
@@ -23,8 +23,8 @@ const setupToken = async () => {
 export async function getDriver(local: boolean = true) {
 
   await setupToken()
-  const authService = new YDB.TokenAuthService(accessToken)
-  const driver = new YDB.Driver({endpoint, database, authService})
+  const authService = new TokenAuthService(accessToken)
+  const driver = new Driver({endpoint, database, authService})
   const timeout = 10000;
   if (!await driver.ready(timeout)) {
     console.error(`Driver has not become ready in ${timeout}ms!`);

@@ -4,7 +4,7 @@ const NOTIFICATION_OK = {
     version: "1.0.0"
 }
 
-export const json = (body: {[key: string]: string}) => ({
+export const json = (body: {[key: string]: string | number}) => ({
     statusCode: 200,
     body: JSON.stringify(body),
     'headers': {

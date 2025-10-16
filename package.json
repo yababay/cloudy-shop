@@ -11,6 +11,7 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"test:unit": "vitest",
+		"test:session": "npx ts-node scripts/session.ts",
 		"test": "npm run test:unit -- --run"
 	},
 	"files": [
@@ -39,9 +40,12 @@
 		"@sveltejs/kit": "^2.43.2",
 		"@sveltejs/package": "^2.5.4",
 		"@sveltejs/vite-plugin-svelte": "^6.2.0",
+		"@types/jest": "^30.0.0",
+		"jest": "^30.2.0",
 		"publint": "^0.3.13",
 		"svelte": "^5.39.5",
 		"svelte-check": "^4.3.2",
+		"ts-jest": "^29.4.5",
 		"typescript": "^5.9.2",
 		"vite": "^7.1.7",
 		"vitest": "^3.2.4"
