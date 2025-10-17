@@ -20,7 +20,7 @@ export const stringsFromResult = (result: YDB.Ydb.Table.ExecuteQueryResult): str
 export const stringFromResult = (result: YDB.Ydb.Table.ExecuteQueryResult): string => {
     const rows = rowsFromResult(result)
     const value = stringFromRows(rows, false)
-    if(Array.isArray(value)) throw 'no arrays here'
+    if(Array.isArray(value)) throw 'no string arrays here'
     return value
 }
 
@@ -44,7 +44,7 @@ export const intsFromResult = (result: YDB.Ydb.Table.ExecuteQueryResult): number
 export const intFromResult = (result: YDB.Ydb.Table.ExecuteQueryResult): number => {
     const rows = rowsFromResult(result)
     const value = intFromRows(rows, false)
-    if(Array.isArray(value)) throw 'no arrays here'
+    if(Array.isArray(value)) throw 'no int arrays here'
     return value
 }
 
@@ -58,7 +58,10 @@ export const rowsFromResult = (result: YDB.Ydb.Table.ExecuteQueryResult) => {
 
 export const intFromItem = (item: YDB.Ydb.IValue): number => {
     const { int64Value, int32Value, uint64Value, uint32Value } = item
-    const toInt = (v: number | Long | null | undefined) => (typeof v === 'number' || (v && typeof v === 'object')) && +v || NaN
+    const toInt = (v: number | Long | null | undefined | string) => {
+        if(typeof v === 'number' || (v && typeof v === 'object') || (v && typeof v === 'string')) return +v
+        return NaN
+    }
     let n = toInt(int64Value)
     if(!isNaN(n)) return n
     n = toInt(int32Value)
@@ -67,7 +70,7 @@ export const intFromItem = (item: YDB.Ydb.IValue): number => {
     if(!isNaN(n)) return n
     n = toInt(uint32Value)
     if(!isNaN(n)) return n
-    throw 'no number value'
+    throw `no number value: ${JSON.stringify(item)} (value = ${n})`
 }
 
 export const stringFromItem = (item: YDB.Ydb.IValue): string => {

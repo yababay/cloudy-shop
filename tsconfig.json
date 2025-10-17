@@ -15,7 +15,7 @@
 	"exclude": [
 		"*.test.ts", 
 		"src/lib/server/ydb/driver4vitest.ts", 
-		"src/lib/server/queryes/models.ts", 
+		"src/lib/server/queries/models.ts", 
 		"src/lib/server/instructions/index.ts"
 	]
 }

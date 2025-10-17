@@ -56,6 +56,8 @@
 	"dependencies": {
 		"axios": "^1.12.2",
 		"dotenv": "^17.2.3",
+		"showdown": "^2.1.0",
+		"telegraf": "^4.16.3",
 		"ydb-sdk": "^5.11.1"
 	}
 }
