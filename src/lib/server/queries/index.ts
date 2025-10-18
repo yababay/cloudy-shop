@@ -1,4 +1,5 @@
 export * from './delivery.js'
 export * from './fulfill.js'
 export * from './notification.js'
+export * from './stocks.js'
 export * from './util.js'

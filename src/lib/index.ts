@@ -1,7 +1,8 @@
-import { delivery, notification, telegram } from './server/index.js'
+import { delivery, notification, telegram, stocks } from './server/index.js'
 
 export {
     delivery,
     notification,
-    telegram
+    telegram,
+    stocks
 }

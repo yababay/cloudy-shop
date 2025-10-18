@@ -23,6 +23,11 @@ export const sendMessage = async (message: string) => {
     await TG.sendMessage(TELEGRAM_CHANNEL, message, OPTIONS)
 }
 
+export const sendStocksMessage = async (ok: boolean) => {
+    const message = ok ? '🛍️ Обновление данных об остатках на Яндекс-маркете произведено успешно.' : '❌ Не удалось обновить данные об остатках на Яндекс-маркете.'
+    await sendMessage(message)
+}
+
 export const sendOrderCreatedMessage = async (orderId: number) => {
     let message = `🆗 От Маркета получен заказ № ${orderId}.`
     await sendMessage(message)

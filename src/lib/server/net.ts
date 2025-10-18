@@ -16,6 +16,11 @@ export const getWithToken = async (url: string) => {
     return data
 }
 
+export const putWithToken = async (url: string, body: object) => {
+    const { data } = await axios.put(url, body, { headers })
+    return data
+}
+
 export const postWithToken = async (url: string, body: object) => {
     const { data } = await axios.post(url, body, { headers })
     return data
@@ -27,7 +32,7 @@ const NOTIFICATION_OK = {
     version: "1.0.0"
 }
 
-export const text = (body: string) => ({
+export const text = (body: string = '') => ({
     statusCode: 200,
     body,
     'headers': {

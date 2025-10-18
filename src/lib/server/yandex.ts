@@ -2,7 +2,7 @@ import axios from "axios"
 import type { Order } from "../types/yandex.js"
 import { getWithToken, postWithToken } from "./net.js"
 
-const apiPrefixV2 = 'https://api.partner.market.yandex.ru/v2'
+export const apiPrefixV2 = 'https://api.partner.market.yandex.ru/v2'
 
 export const getOrder = async (campaignId: number, orderId: number) => {
     const data = await getWithToken(`${apiPrefixV2}/campaigns/${campaignId}/orders/${orderId}`)

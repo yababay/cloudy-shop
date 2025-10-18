@@ -79,6 +79,11 @@ export const telegram = async (event: YC.CloudFunctionsHttpEvent, context: YC.Cl
         return reply
     }
 
+    if(text === '/version') {
+        await ctx.reply('0.0.1')
+        return reply
+    }
+
     if(text === '/start') {
         await ctx.reply('🤖 Этот бот помогает заполнять коды для цифровых товаров компании Activation Service.\n\nВведите `/`, чтобы увидеть список доступных команд.', {parse_mode: 'Markdown'})
         return reply
