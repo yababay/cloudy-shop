@@ -82,9 +82,11 @@ export const deliverOrder = async (session: YDB.TableSession, id: number | strin
     const { items, codes } = await tryToFulfill(session, id)
     const ff = isFulfilled(items, codes)
     let chat = ''
-    if(ff || force) chat = await prepareAndSend(session, id, items, codes, instructions)
-    await sendDeliveryMessage(id, chat)
-    return ff
+    if(ff || force) {
+        chat = await prepareAndSend(session, id, items, codes, instructions)
+        await sendDeliveryMessage(id, chat)
+    }
+    return {isFulfilled: ff, codes, items}
 }
 
 export const deliverAll = async (session: YDB.TableSession, force = false) => {

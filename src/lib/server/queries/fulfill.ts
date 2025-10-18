@@ -1,11 +1,10 @@
 import  YDB from 'ydb-sdk'
 import { dateFromItem, intFromItem, intFromQuery, isEmpty, rowsFromResult, stringFromItem } from '../ydb/util.js'
 import type { Item } from '$lib/types/index.js'
-import { prepareAndSend } from './delivery.js'
 
 export const isFulfilled = (items: Item[], codes: Map<string, string[]>) => items.reduce((acc, {offerId, count}) => {
     const ffCount = codes.get(offerId) || 0
-    acc &&= ffCount === count
+    acc &&= (ffCount === count)
     return acc
 }, true)
 

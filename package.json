@@ -4,6 +4,8 @@
 	"scripts": {
 		"build": "vite build && npm run prepack",
 		"upload:delivery": "npm run build && ./scripts/upload.sh delivery",
+		"upload:notification": "npm run build && ./scripts/upload.sh notification",
+		"upload:telegram": "npm run build && ./scripts/upload.sh telegram",
 		"dev": "vite dev",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",

@@ -1,6 +1,6 @@
 import { Telegram } from 'telegraf'
 import type { ParseMode } from 'telegraf/types'
-import type { Order } from '../types/yandex.js'
+import type { Item } from '../../types/yandex.js'
 import { Context } from 'telegraf'
 
 const { TELEGRAM_BOT_TOKEN, TELEGRAM_CHANNEL } = process.env
@@ -46,12 +46,13 @@ export const sendErrorMessage = async (orderId: number | string, err: unknown) =
     await sendMessage(message)
 }
 
-export const sendProcessingStartedMessage = async (order: Order, sum: number, count: number) => {
-    const { id, items } = order
+export const sendProcessingStartedMessage = async (orderId: number | string, items: Item[], codes: Map<string, string[]>) => { //order: Order, sum: number, count: number) => {
     const basket = (items || []).map(({offerId, count}) => `${offerId} (${count})`).join(', ')
-    let message = `⏱️ Состав заказа № ${id}: ${basket}.`
-    const lack = sum - count
+    let message = `⏱️ Состав заказа № ${orderId}: ${basket}.`
+    const ff = Array.from(codes.entries()).reduce((acc, arr) => acc + arr.length, 0)
+    const count = items.reduce((acc, {count}) => acc + count, 0)
+    const lack = count - ff
     if(!lack) message += ` Заказ обеспечен кодами и будет обработан автоматически.`
-    else message += ` Заполнено кодов: ${count} из ${sum}. Перейдите к [боту 🤖](https://t.me/activation_service_bot), чтобы добавить.`
+    else message += ` Заполнено кодов: ${ff} из ${count}. Перейдите к [боту 🤖](https://t.me/activation_service_bot), чтобы добавить.`
     await sendMessage(message)
 }
