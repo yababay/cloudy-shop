@@ -34,23 +34,23 @@ export const intFromQuery = async (session: YDB.TableSession, query: string): Pr
     return intFromResult(result)
 }
 
-export const intsFromResult = (result: YDB.Ydb.Table.ExecuteQueryResult): number[] => {
-    const rows = rowsFromResult(result)
+export const intsFromResult = (result: YDB.Ydb.Table.ExecuteQueryResult, i = 0): number[] => {
+    const rows = rowsFromResult(result, i)
     const values = intFromRows(rows, true)
     if(Array.isArray(values)) return values
     throw 'only arrays here'
 }
 
-export const intFromResult = (result: YDB.Ydb.Table.ExecuteQueryResult): number => {
-    const rows = rowsFromResult(result)
+export const intFromResult = (result: YDB.Ydb.Table.ExecuteQueryResult, i = 0): number => {
+    const rows = rowsFromResult(result, i)
     const value = intFromRows(rows, false)
     if(Array.isArray(value)) throw 'no int arrays here'
     return value
 }
 
-export const rowsFromResult = (result: YDB.Ydb.Table.ExecuteQueryResult) => {
+export const rowsFromResult = (result: YDB.Ydb.Table.ExecuteQueryResult, i = 0) => {
     const { resultSets } = result
-    const [ resultSet ]  = resultSets
+    const resultSet  = resultSets[i]
     const { rows } = resultSet
     if(!Array.isArray(rows)) throw 'bad rows'
     return rows

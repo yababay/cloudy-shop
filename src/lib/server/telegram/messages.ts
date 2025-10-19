@@ -51,13 +51,11 @@ export const sendErrorMessage = async (orderId: number | string, err: unknown) =
     await sendMessage(message)
 }
 
-export const sendProcessingStartedMessage = async (orderId: number | string, items: Item[], codes: Map<string, string[]>) => { //order: Order, sum: number, count: number) => {
+export const sendProcessingStartedMessage = async (orderId: number | string, items: Item[], count: number, sum: number) => {//codes: Map<string, string[]>) => { //order: Order, sum: number, count: number) => {
     const basket = (items || []).map(({offerId, count}) => `${offerId} (${count})`).join(', ')
     let message = `⏱️ Состав заказа № ${orderId}: ${basket}.`
-    const ff = Array.from(codes.entries()).reduce((acc, arr) => acc + arr.length, 0)
-    const count = items.reduce((acc, {count}) => acc + count, 0)
-    const lack = count - ff
+    const lack = sum - count
     if(!lack) message += ` Заказ обеспечен кодами и будет обработан автоматически.`
-    else message += ` Заполнено кодов: ${ff} из ${count}. Перейдите к [боту 🤖](https://t.me/activation_service_bot), чтобы добавить.`
+    else message += ` Заполнено кодов: ${count} из ${sum}. Перейдите к [боту 🤖](https://t.me/activation_service_bot), чтобы добавить.`
     await sendMessage(message)
 }

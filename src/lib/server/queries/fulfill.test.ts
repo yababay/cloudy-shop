@@ -1,22 +1,65 @@
 import type { Driver } from 'ydb-sdk';
 import { getDriver } from '../ydb/driver4vitest.js';
-import { getFulfillness, getUnfilled, restoreItems, tryToFulfill } from './fulfill.js';
+import { amountsOfOffers, getFulfillness, getSumAndCount, getUnfilled, restoreItems, tryToFulfill } from './fulfill.js';
 
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { createTables } from './models.js';
 import type { Item } from '$lib/types/index.js';
-import { intFromQuery } from '../ydb/util.js';
+import { intFromItem, intFromQuery, intFromResult, rowsFromResult, stringFromItem } from '../ydb/util.js';
 
 const ORDER_ID = 49803606592
 
 let driver: Driver
 
-describe.skip('Fulfill order', () => {
+const countQuery  = `select count(*) from codes where order_id = ${ORDER_ID}`
+const sumQuery    = `select sum(amount) from ordered_items where order_id = ${ORDER_ID}`
 
-  let orders: number[]
-  let items: Item[]
+describe('Fulfill order', () => {
+  
+  it('should be insufficient count', async () => {
+    await driver.tableClient.withSession(async (session) => {
+      const where = ` where order_id = ${ORDER_ID} and offer_id = 'APPLE5050'`
+      const amount = await intFromQuery(session, `
+          update ordered_items set amount = 100 ${where};
+          select amount from ordered_items ${where}
+      `)
+      expect(amount).toBe(100)
+      const { count, sum } = await getSumAndCount(session, ORDER_ID)
+      expect(sum).toBe(101)
+      expect(count).toBe(7)
+    })
+  })
 
-  it('should be 1 order', async () => {
+  it.skip('should be count and sum from combined query', async () => {
+    await driver.tableClient.withSession(async (session) => {
+      const { count, sum } = await getSumAndCount(session, ORDER_ID)
+      expect(sum).toBe(count)
+    })
+  })
+
+  it.skip('should be correct amounts of offers', async () => {
+    await driver.tableClient.withSession(async (session) => {
+      const amounts = await amountsOfOffers(session, ORDER_ID)
+      expect(amounts.get('APPLE500')).toBe(1)
+      expect(amounts.get('APPLE5050')).toBe(3)
+    })
+  })
+
+  it.skip('should be integer result after COUNT query', async () => {
+    await driver.tableClient.withSession(async (session) => {
+      const count = await intFromQuery(session, countQuery)
+      expect(count).toBe(0)
+    })
+  })
+
+  it.skip('should be integer result after SUM query', async () => {
+    await driver.tableClient.withSession(async (session) => {
+      const sum = await intFromQuery(session, sumQuery)
+      expect(sum).toBe(4)
+    })
+  })
+
+  it.skip('should be 1 order', async () => {
 
     orders = (await driver.tableClient.withSession(async (session) => {
         return await getUnfilled(session)
@@ -28,7 +71,7 @@ describe.skip('Fulfill order', () => {
 
   })
 
-  it('should be 2 items', async () => {
+  it.skip('should be 2 items', async () => {
 
     items = await driver.tableClient.withSession(async (session) => {
       return await restoreItems(session, orders[0])
@@ -37,7 +80,7 @@ describe.skip('Fulfill order', () => {
     expect(items.length).toBe(2)
   });
 
-  it('should be not fulfilled', async () => {
+  it.skip('should be not fulfilled', async () => {
 
     const { sum, count } = await driver.tableClient.withSession(async (session) => {
       return await getFulfillness(session, orders[0])
@@ -47,7 +90,7 @@ describe.skip('Fulfill order', () => {
     expect(count).toBe(0)
   });
 
-  it('should have free codes', async () => {
+  it.skip('should have free codes', async () => {
 
     const apple500 = await driver.tableClient.withSession(async (session) => {
       return await intFromQuery(session, `select count(*) from codes where offer_id = 'APPLE500'`)
@@ -61,7 +104,7 @@ describe.skip('Fulfill order', () => {
     expect(apple5050).toBe(6)
   });
 
-  it('should be fulfilled', async () => {
+  it.skip('should be fulfilled', async () => {
 
     const { codes } = await driver.tableClient.withSession(async (session) => {
         return await tryToFulfill(session, orders[0])
@@ -91,8 +134,8 @@ describe.skip('Fulfill order', () => {
         await createTables(session)
         await session.executeQuery(`
           insert into ordered_items (item_id, order_id, campaign_id, offer_id, amount, created_at) values 
-            (968316434,	49803606592,	110987348, 'APPLE500',	  1,	Datetime('2025-10-14T14:40:09Z')),
-            (968316435,	49803606592,	110987348, 'APPLE5050',	3,	Datetime('2025-10-14T14:40:09Z'))
+            (968316434,	${ORDER_ID},	110987348, 'APPLE500',	  1,	Datetime('2025-10-14T14:40:09Z')),
+            (968316435,	${ORDER_ID},	110987348, 'APPLE5050',	3,	Datetime('2025-10-14T14:40:09Z'))
         `)
         await session.executeQuery(`
           insert into codes (code, offer_id, user, created_at) values 
@@ -109,9 +152,13 @@ describe.skip('Fulfill order', () => {
             ('zxcvbn54322',	'APPLE5050', 1234567, 	Datetime('2025-10-14T14:40:09Z'))
         `)
     })
+
   })
 
   afterAll(async () => {
     await driver.destroy()
   })
+
+  let orders: number[]
+  let items: Item[]
 });

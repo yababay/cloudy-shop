@@ -1,6 +1,38 @@
 import  YDB from 'ydb-sdk'
-import { dateFromItem, intFromItem, intFromQuery, isEmpty, rowsFromResult, stringFromItem } from '../ydb/util.js'
+import { dateFromItem, intFromItem, intFromQuery, intFromResult, isEmpty, rowsFromResult, stringFromItem } from '../ydb/util.js'
 import type { Item } from '$lib/types/index.js'
+
+const countQuery  = (orderId: number | string) => `select count(*) from codes where order_id = ${orderId}`
+const sumQuery    = (orderId: number | string) => `select sum(amount) from ordered_items where order_id = ${orderId}`
+const offersQuery = (orderId: number | string) => `select offer_id, amount from ordered_items where order_id = ${orderId}`
+
+export const getSumAndCount = async (session: YDB.TableSession, orderId: number | string, upsertQuery = '') => {
+    if(upsertQuery) await session.executeQuery(upsertQuery)
+    const amounts = await amountsOfOffers(session, orderId)
+    let queries = Array.from(amounts.keys()).reduce((acc, offerId) => {
+        const arr = new Array<string>(amounts.get(offerId) || 0)
+            .fill(`update codes set order_id = ${orderId} where code in (select code from codes where offer_id = '${offerId}' and order_id is null limit 1)`)
+        return [ ...acc, ...arr ]
+    }, new Array<string>(`update codes set order_id = null where order_id = ${orderId}`))
+    await session.executeQuery(queries.join(';'))
+    const results = await session.executeQuery([countQuery(orderId), sumQuery(orderId)].join(';'))
+    const count = intFromResult(results, 0)
+    const sum = intFromResult(results, 1)
+    return { count, sum, queries }
+}
+
+export const amountsOfOffers = async (session: YDB.TableSession, orderId: number | string) => {
+    const result = await session.executeQuery(offersQuery(orderId))
+    const offers = rowsFromResult(result).map(({items}) => {
+        if(!items) throw 'no items'
+        const [ offerItem, amountItem ] = items
+        return [ stringFromItem(offerItem), intFromItem(amountItem) ]
+    }) as Iterable<readonly [string, number]>
+    return new Map<string, number>(offers)
+}
+
+
+// ==========================
 
 export const isFulfilled = (items: Item[], codes: Map<string, string[]>) => items.reduce((acc, {offerId, count}) => {
     const ffCount = codes.get(offerId) || 0

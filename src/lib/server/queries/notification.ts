@@ -1,4 +1,4 @@
-import { deliverOrder, getDriver, getOrder, getYDBTimestamp, prepareInstructions, sendErrorMessage, sendOrderCreatedMessage, sendOrderDeliveredMessage, sendProcessingStartedMessage } from '../index.js'
+import { getDriver, getOrder, getSumAndCount, getYDBTimestamp, sendErrorMessage, sendOrderCreatedMessage, sendOrderDeliveredMessage, sendProcessingStartedMessage } from '../index.js'
 import type { Item, Order } from '../../types/index.js'
 import type { YC } from '../../yc.js'
 
@@ -45,11 +45,8 @@ export const notification = async (event: YC.CloudFunctionsHttpEvent, context: Y
             const driver = await getDriver()
 
             await driver.tableClient.withSession(async (session) => {
-                await session.executeQuery(`${query} ${values.join(', ')}`)
-                const instructions = await prepareInstructions(session)
-                const {isFulfilled, codes, items} = await deliverOrder(session, orderId, instructions)
-                //console.log('processing started', isFulfilled, items, codes)
-                if(!isFulfilled) await sendProcessingStartedMessage(orderId, items, codes)
+                const { sum, count } = await getSumAndCount(session, orderId, `${query} ${values.join(', ')}`)
+                await sendProcessingStartedMessage(orderId, items, count, sum)
             })
             
             await driver.destroy()
