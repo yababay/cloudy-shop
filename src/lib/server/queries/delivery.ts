@@ -5,7 +5,6 @@ import {
     compaignByOrder, 
     getDriver, 
     getUnfilled, 
-    tryToFulfill, 
     getYDBTimestamp, 
     rowsFromResult, 
     stringFromItem, 
@@ -16,42 +15,12 @@ import {
     sendDeliveryMessage, 
     sendErrorMessage, 
     text, 
-    isFulfilled
+    getSumAndCount,
+    restoreItems
 } from '../index.js'
-
-import type { Item } from '$lib/types/index.js'
+import type { Context } from 'telegraf'
 
 const converter = new showdown.Converter()
-
-export const prepareAndSend = async (session: YDB.TableSession, orderId: number | string, items: Item[], codes: Map<string, string[]>, instructions: string[]) => {
-
-    const campaignId = await compaignByOrder(session, orderId)
-    const chatUrl = getChatUrl(campaignId, orderId)
-    const [ACTIVATION_INSTRUCTION, HOLIDAY_INSTRUCTION, CHAT_FIRST_MESSAGE, FAKE_CODE] = instructions.map((instr, i) => i < 2 ? converter.makeHtml(instr.replace('CHAT_URL', chatUrl)) : instr)
-    const getCodes = (offerId: string, count: number) => {
-        const stub = new Array<string>(count).fill(FAKE_CODE)
-        const fulfilled = codes.get(offerId) || []
-        return [ ...fulfilled, ...stub ]
-    }
-    const FULL_INSTRUCTION = `${HOLIDAY_INSTRUCTION}\n\n${ACTIVATION_INSTRUCTION}`
-    const activate_till = '2050-01-01'
-    let withChat = false
-    const goods = items.map(({id, offerId, count}) => {
-        const codes = getCodes(offerId, count)
-        const withFake = codes.includes(FAKE_CODE)
-        withChat ||= withFake
-        const slip = withFake ? FULL_INSTRUCTION : ACTIVATION_INSTRUCTION
-        return { id, codes, activate_till, slip }
-    })
-    const reply = await deliverItems(campaignId, orderId, goods)
-    if(typeof reply === 'boolean' && reply) await session.executeQuery(`update ordered_items set fulfilled_at = ${getYDBTimestamp()} where order_id = ${orderId}`)
-    else throw `Маркет не принял товары: ${JSON.stringify(reply)}`
-    if(withChat) {
-        const businessId = await getBusinessId(campaignId)
-        await openChat(businessId, orderId, CHAT_FIRST_MESSAGE.replace('CHAT_URL', chatUrl))
-    }
-    return withChat ? chatUrl : ''
-}
 
 export const prepareInstructions = async (session: YDB.TableSession) => {
 
@@ -78,18 +47,58 @@ export const prepareInstructions = async (session: YDB.TableSession) => {
     return [ ...replaced, FAKE_CODE ]
 }
 
-export const deliverOrder = async (session: YDB.TableSession, id: number | string, instructions: string[], force = false) => {
-    const { items, codes } = await tryToFulfill(session, id)
-    const ff = isFulfilled(items, codes)
-    let chat = ''
-    if(ff || force) {
-        chat = await prepareAndSend(session, id, items, codes, instructions)
-        await sendDeliveryMessage(id, chat)
-    }
-    return {isFulfilled: ff, codes, items}
+export const getItemsAndCodes = async (session: YDB.TableSession, id: number | string) => {
+    const items = await restoreItems(session, id)
+    const result = await session.executeQuery(`select code, offer_id from codes where order_id = ${id}`)
+    const codes = rowsFromResult(result).map(({items}) => {
+        if(!items) throw 'no items in fulfilled result'
+        const [ codeItem, offerItem ] = items
+        return { code: stringFromItem(codeItem), offer: stringFromItem(offerItem) }
+    }).reduce((acc, {code, offer}) => {
+        const codes = acc.get(offer)
+        acc.set(offer, codes ? [ ...codes, code ] : [ code ])
+        return acc
+    }, new Map<string, string[]>())
+    return { items, codes }
 }
 
-export const deliverAll = async (session: YDB.TableSession, force = false) => {
+export const deliverOrder = async (session: YDB.TableSession, id: number | string, instructions: string[], ctx?: Context) => {
+    const { items, codes } = await getItemsAndCodes(session, id)
+    const campaignId = await compaignByOrder(session, id)
+    const chatUrl = getChatUrl(campaignId, id)
+    const [ACTIVATION_INSTRUCTION, HOLIDAY_INSTRUCTION, CHAT_FIRST_MESSAGE, FAKE_CODE] = instructions.map((instr, i) => i < 2 ? converter.makeHtml(instr.replace('CHAT_URL', chatUrl)) : instr)
+    const getCodes = (offerId: string, count: number) => {
+        const stub = new Array<string>(count).fill(FAKE_CODE)
+        const fulfilled = codes.get(offerId) || []
+        return [ ...fulfilled, ...stub ].slice(0, count)
+    }
+
+    const FULL_INSTRUCTION = `${HOLIDAY_INSTRUCTION}\n\n${ACTIVATION_INSTRUCTION}`
+    const activate_till = '2050-01-01'
+    let withChat = false
+    const goods = items.map(({id, offerId, count}) => {
+        const codes = getCodes(offerId, count)
+        const withFake = codes.includes(FAKE_CODE)
+        withChat ||= withFake
+        const slip = withFake ? FULL_INSTRUCTION : ACTIVATION_INSTRUCTION
+        return { id, codes, activate_till, slip }
+    })
+
+    const reply = await deliverItems(campaignId, id, goods)
+    if(typeof reply === 'boolean' && reply) await session.executeQuery(`update ordered_items set fulfilled_at = ${getYDBTimestamp()} where order_id = ${id}`)
+    else throw `Маркет не принял товары: ${JSON.stringify(reply)}`
+
+    if(withChat) {
+        const businessId = await getBusinessId(campaignId)
+        await openChat(businessId, id, CHAT_FIRST_MESSAGE.replace('CHAT_URL', chatUrl))
+    }
+
+    await sendDeliveryMessage(id, withChat ? chatUrl : '', ctx)
+    //console.log(JSON.stringify(goods))
+    return {codes, items}
+}
+
+export const deliverAll = async (session: YDB.TableSession, ctx?: Context) => {
     const oids = await getUnfilled(session)
     const previous = new Date()
     let mins = previous.getMinutes()
@@ -99,9 +108,10 @@ export const deliverAll = async (session: YDB.TableSession, force = false) => {
     const instructions = await prepareInstructions(session)
 
     for(const {id, ts} of oids) {
-        if(ts.getTime() > previous.getTime()) continue // too young
         try {
-            await deliverOrder(session, id, instructions, force)
+            const { sum, count } = await getSumAndCount(session, id)
+            if(!(sum === count || ts.getTime() < previous.getTime())) continue
+            await deliverOrder(session, id, instructions, ctx)
             ok.push(id)
         }
         catch(err){
@@ -117,7 +127,7 @@ export const delivery = async () => {
     const driver = await getDriver()
 
     const processed = await driver.tableClient.withSession(async (session) => {
-        return await deliverAll(session, true)
+        return await deliverAll(session)
     })
 
     await driver.destroy()

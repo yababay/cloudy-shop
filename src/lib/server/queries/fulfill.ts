@@ -6,6 +6,19 @@ const countQuery  = (orderId: number | string) => `select count(*) from codes wh
 const sumQuery    = (orderId: number | string) => `select sum(amount) from ordered_items where order_id = ${orderId}`
 const offersQuery = (orderId: number | string) => `select offer_id, amount from ordered_items where order_id = ${orderId}`
 
+export const restoreItems = async (session: YDB.TableSession, orderId: number | string): Promise<Item[]> => {
+    const result = await session.executeQuery(`select item_id, offer_id, amount from ordered_items where order_id = ${orderId} order by offer_id`) 
+    const rows = rowsFromResult(result)
+    return rows.map(({items}) => {
+        if(!items) throw 'no items to restore'
+        const [idItem, offerItem, countItem] = items
+        const id = intFromItem(idItem)
+        const offerId = stringFromItem(offerItem)
+        const count = intFromItem(countItem)
+        return { id, offerId, count }
+    })
+}
+
 export const getSumAndCount = async (session: YDB.TableSession, orderId: number | string, upsertQuery = '') => {
     if(upsertQuery) await session.executeQuery(upsertQuery)
     const amounts = await amountsOfOffers(session, orderId)
@@ -95,17 +108,4 @@ export const getUnfilled = async (session: YDB.TableSession): Promise<Array<{id:
         return { id: intFromItem(idItem), ts: dateFromItem(tsItem) }
     })
     return rows
-}
-
-export const restoreItems = async (session: YDB.TableSession, orderId: number | string): Promise<Item[]> => {
-    const result = await session.executeQuery(`select item_id, offer_id, amount from ordered_items where order_id = ${orderId} order by offer_id`) 
-    const rows = rowsFromResult(result)
-    return rows.map(({items}) => {
-        if(!items) throw 'no items to restore'
-        const [idItem, offerItem, countItem] = items
-        const id = intFromItem(idItem)
-        const offerId = stringFromItem(offerItem)
-        const count = intFromItem(countItem)
-        return { id, offerId, count }
-    })
 }

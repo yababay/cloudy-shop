@@ -1,26 +1,29 @@
 import  YDB from 'ydb-sdk'
-import { deliverOrder, prepareInstructions } from './delivery.js'
+import { deliverOrder, getItemsAndCodes, prepareInstructions } from './delivery.js'
 import { Markup, type Context } from 'telegraf'
 import { intsFromQuery, rowsFromResult, stringFromItem } from '../ydb/util.js'
+import { getSumAndCount, restoreItems } from './fulfill.js'
 
 export const lackOfCodes = async (session: YDB.TableSession, orderId: string | number, ctx: Context) => {
 
-    const instructions = await prepareInstructions(session)
-    const {isFulfilled, codes, items} = await deliverOrder(session, orderId, instructions)
-
-    if(isFulfilled){
-        await findUnfulfilled(session, ctx)
+    const { count, sum } = await getSumAndCount(session, orderId)
+    if(count === sum) {
+        const instructions = await prepareInstructions(session)
+        await deliverOrder(session, orderId, instructions, ctx)
         return
     }
+    
+    const {codes, items} = await getItemsAndCodes(session, orderId)
 
     const offers = items
         .map(({offerId, count}) => {
             const arr = codes.get(offerId) || []
             return [ offerId, count, count - arr.length ]
         })
+        .filter(([ _, __, lack ]) => +lack > 0)
         .map(([offer, amount, lack]) => `<code>${offer}</code> (${lack}/${amount})`)
 
-    const message = `В заказе № ${orderId} не заполнены коды для товаров: ${offers.join(', ')}.`
+    const message = `В заказе № ${orderId} не заполнены коды для ${offers.length === 1 ? 'товара' : 'товаров:'} ${offers.join(', ')}.`
     await ctx.reply(message, {parse_mode: 'HTML'})
 }
 
@@ -49,6 +52,10 @@ export const getUnclosed = async (session: YDB.TableSession, ff = false): Promis
     return await intsFromQuery(session, "select distinct order_id from ordered_items where fulfilled_at is null and  delivered_at is null")
 }
 
+export const orderButtons = (ids: number[]) => Markup.inlineKeyboard([ids.map(id => [`№ ${id}`, `uf_${id}`]).map(([title, num]) => Markup.button.callback(title, num))])
+
+export const unsufficientOrders = `⏱️ Недостаточно кодов для заказов:`
+
 export const findUnfulfilled = async (session: YDB.TableSession, ctx: Context) => {
     let ids = await getUnclosed(session)
     if(!ids.length) { 
@@ -60,9 +67,7 @@ export const findUnfulfilled = async (session: YDB.TableSession, ctx: Context) =
         await lackOfCodes(session, id, ctx)
         return
     }
-    else await ctx.reply(`⏱️ Недостаточно кодов для заказов:`, Markup.inlineKeyboard(
-        ids.map(id => [`№ ${id}`, `uf_${id}`]).map(([title, num]) => Markup.button.callback(title, num))
-    ))
+    else await ctx.reply(unsufficientOrders, orderButtons(ids))
 }
                                 
 export const getCodes = async (session: YDB.TableSession) => {

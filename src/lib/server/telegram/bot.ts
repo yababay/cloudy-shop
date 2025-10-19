@@ -1,34 +1,17 @@
-import { Telegram, Context, Markup } from 'telegraf'
+import { Telegram, Context } from 'telegraf'
 import type { YC } from '../../yc.js'
-import type { UserFromGetMe } from 'telegraf/types'
-import { findUnfulfilled, getCodes, lackOfCodes } from '../queries/bot.js'
 import { getDriver } from '../ydb/driver.js'
-import { getYDBTimestamp, isEmpty, stringsFromQuery } from '../ydb/util.js'
-import { deliverAll } from '../queries/delivery.js'
+import { BOT_INFO, REPLY } from './util.js'
+import { simpleReplies, textFromDatabase } from './text.js'
+import type { Driver } from 'ydb-sdk'
+import { actionsFromDatabase } from './action.js'
 
-const { TELEGRAM_BOT_TOKEN, TELEGRAM_CHANNEL } = process.env
+const { TELEGRAM_BOT_TOKEN } = process.env
 
 const TG = new Telegram(TELEGRAM_BOT_TOKEN || '')
 
-const BOT_INFO: UserFromGetMe = {
-    is_bot: true, username: 'activation_service_bot',
-    can_join_groups: false,
-    can_read_all_group_messages: false,
-    supports_inline_queries: true,
-    id: 0,
-    first_name: 'Activation Service Bot'
-}
-
-const reply = {
-    statusCode: 200,
-    body: JSON.stringify({ status: "ok" }),
-    'headers': {
-        'Content-Type': 'application/json',
-    },
-    isBase64Encoded: false
-}
-
 export const telegram = async (event: YC.CloudFunctionsHttpEvent, context: YC.CloudFunctionsHttpContext) => {
+    
     let payload: string = context.getPayload()
     if(typeof payload === 'string') payload = JSON.parse(payload)
     const ctx = Reflect.construct(Context, [payload, TG, BOT_INFO]) as Context
@@ -38,117 +21,41 @@ export const telegram = async (event: YC.CloudFunctionsHttpEvent, context: YC.Cl
     const userId = from?.id
     if(typeof userId !== 'number') throw 'no user id in telegram'
 
-    if(data) {
-        const [ _, action, orderId ] = /^([a-z]+)_(\d+)$/.exec(data) || []
+    let driver: Driver | undefined
 
-        const driver = await getDriver()
+    console.log('data and text', data, text)
 
-        await driver.tableClient.withSession(async (session) => {
+    try {
+        if(data) {
+            driver = await getDriver()
 
-            switch(action){
-                case 'deliver':
-                    await deliverAll(session, true)
-                    break
-                case 'cancel':
-                    await ctx.reply(`⏱️ Отправка заказов отложена.`)
-                    break
-                case 'uf':
-                    await lackOfCodes(session, orderId, ctx)
-                    break
-                default:
-                    await ctx.reply(`🤔 Команда не распознана…`)
-            }
-        })
+            await driver.tableClient.withSession(async (session) => {
+                await actionsFromDatabase(session, data, ctx, userId)
+            })
 
-        await driver.destroy()
-        return reply
-    }
+            await driver.destroy()
+            driver = undefined
+            return REPLY
+        }
+        else {
 
-    if(typeof text !== 'string') throw 'no text in telegram'
-        
-    if(text.startsWith('/remove')){
-        const [ _, code] = text.split(/\s+/)
-        if(!code) return await ctx.reply(`🤔 Не удалось распознать код для удаления…`)
-        const driver = await getDriver()
-        const codes = await driver.tableClient.withSession(async (session) => {
-            await session.executeQuery(`delete from codes where code = '${code}' where order_id is null`)
-            return await getCodes(session)
-        })
-        ctx.reply(codes, {parse_mode: 'HTML'})
-        await driver.destroy()
-        return reply
-    }
+            if(typeof text !== 'string') throw 'Нераспознаваемый ввод.'
 
-    if(text === '/version') {
-        await ctx.reply('0.0.1')
-        return reply
-    }
+            if(['/version', '/help', '/start'].includes(text)) return await simpleReplies(text, ctx)
 
-    if(text === '/start') {
-        await ctx.reply('🤖 Этот бот помогает заполнять коды для цифровых товаров компании Activation Service.\n\nВведите `/`, чтобы увидеть список доступных команд.', {parse_mode: 'Markdown'})
-        return reply
-    }
-        
-    if(text === '/help') {
-        await ctx.reply('📖 Пользуйтесь командами меню (`/check`, `/codes` и др.) или вводите коды активации построчно, например\n\n `APPLE500 qwerty12345`\n`APPLE550 asdfgh67890`.', {parse_mode: 'Markdown'})
-        return reply
-    }
+            driver = await getDriver()
 
-    const driver = await getDriver()
-    await driver.tableClient.withSession(async (session) => {
-
-        switch(text) {
-
-            case '/codes':
-                ctx.reply(await getCodes(session), {parse_mode: 'HTML'})
-                break
-
-            case '/check':
-                await findUnfulfilled(session, ctx)
-                break
-
-            case '/deliver':
-            case '/delivery':
-                await ctx.reply('Отправить незаполненные заказы?', {parse_mode: 'HTML', ...Markup.inlineKeyboard([
-                    [
-                        Markup.button.callback('📤 отравить', `deliver`),
-                        Markup.button.callback('🛑 не отравлять', `cancel`),
-                    ]
-                ])})
-                break
-    
-            default:
-
-                const offers = await stringsFromQuery(session, `select id from offers`)
-
-                let codes = text.trim()
-                    .split(/[\r\n]+/)
-                    .map(row => row.split(/\s+/))
-                
-                let { length } = codes
-
-                codes = codes.filter(arr => arr.length === 2 &&  offers.includes(arr[0]))
-
-                
-                let success = 0
-                
-                for(const [offer, code] of codes) {
-                    if(!isEmpty(await session.executeQuery(`select code from codes where code = '${code}'`))) continue
-                    await session.executeQuery(`insert into codes (offer_id, code, created_at, user) values ('${offer}', '${code}', ${getYDBTimestamp()}, ${userId})`)
-                    success++
-                }
-                
-                if(!length) await ctx.reply(`🤔 Не удалось распознать команду или коды в тексте (<code>${text.slice(0, 20)}</code>).`, {parse_mode: 'HTML'})
-                else if(success !== length) {
-                    const message = `🤔 Успешно обработано ${success} строк из ${length}. Проверьте корректность заполнения. Каждая строка должна содержать только зарегистрированный идентификатор товара (SKU) и код активизации, разделенные пробелом. Возможно, некоторые коды были ранее внесены в базу данных.`
-                    await ctx.reply(message)
-                }
-                else await findUnfulfilled(session, ctx)
+            await driver.tableClient.withSession(async (session) => {
+                await textFromDatabase(session, text, ctx, userId)
+            })
 
         }
-    })
-
-    await driver.destroy()
-    return reply
-
+    }
+    catch(err){
+        await ctx.reply(`🤔 ${err}`)
+    }
+    finally {
+        if(driver) await driver.destroy()
+    }
+    return REPLY
 }
