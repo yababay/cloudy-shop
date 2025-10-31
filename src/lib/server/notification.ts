@@ -53,7 +53,7 @@ export const notification = async (event: YC.CloudFunctionsHttpEvent, context: Y
             const { sum, count, goods } = await getSumAndCount(sql, order_id)
             if(sum === count){
                 const instructions = await prepareInstructions(sql)
-                await deliverOrder(sql, {orderId: order_id, goods}, instructions)
+                await deliverOrder(sql, {orderId: BigInt(orderId), goods}, instructions)
             }
             else await sendProcessingStartedMessage(orderId, items, count, sum)
 
