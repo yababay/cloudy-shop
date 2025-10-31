@@ -1,3 +1,4 @@
+import type { YC } from '../yc.js'
 import { type QueryClient } from '@ydbjs/query'
 import { Datetime, Uint64 } from '@ydbjs/value/primitive'
 import { query } from '@ydbjs/query'
@@ -13,6 +14,28 @@ import { sendDeliveryMessage } from './telegram/messages.js'
 
 const converter = new showdown.Converter()
 
+export const delivery = async (event: YC.CloudFunctionsHttpEvent, context: YC.CloudFunctionsHttpContext) => {
+    let payload = context.getPayload().toString() || 0
+    if(!payload){
+        const details = typeof event === 'object' && Reflect.get(event, 'details');
+        if (details && typeof details === 'object') payload = +Reflect.get(details, 'payload');
+    } 
+    if(!(typeof payload === 'number' && !isNaN(payload))) throw 'bad payload'
+    const driver = await getRemoteDriver()
+    const sql = query(driver)
+    await deliverAll(sql, payload)
+    driver.close()
+
+    return {
+        statusCode: 200,
+        body: 'ok',
+        'headers': {
+            'Content-Type': 'text/plain',
+        },
+        isBase64Encoded: false
+    }
+}
+
 export const getSumAndCount = async (sql: QueryClient, orderId: Uint64 | bigint = TEST_ORDER_ID, fakeCode = FAKE_CODE) => {
     const goods = await prepareGoods(sql, orderId)
     const codes = Array.from(goods.values()).reduce((acc, arr: string[]) => [ ...acc, ...arr], [])
@@ -21,48 +44,42 @@ export const getSumAndCount = async (sql: QueryClient, orderId: Uint64 | bigint 
     return { count, sum, goods }
 }
 
-export const delivery = async () => {
-    const driver = await getRemoteDriver()
-    const sql = query(driver)
-    await deliverAll(sql)
-    driver.close()
-}
-
-export const deliverAll = async (sql: QueryClient, ctx?: Context) => {
+export const deliverAll = async (sql: QueryClient, ttl: number, ctx?: Context) => {
     const [ rows ] = await sql`select distinct order_id, created_at from ordered_items where fulfilled_at is null and delivered_at is null;`
     if(!rows.length) return
     const oids = rows.map(row => {
-        const { order_id, created_at } = row as { order_id: Uint64, created_at: Datetime }
-        return { id: order_id, ts: created_at.value }
+        const { order_id, created_at } = row as { order_id: bigint, created_at: Datetime }
+        return { orderId: order_id, ts: new Date(created_at.toString()) }
     })
     const previous = new Date()
     let mins = previous.getMinutes()
-    mins -= +(process.env.YM_DELIVERY_TERM || 20)
+    mins -= ttl
     previous.setMinutes(mins)
     const ok = new Array<number>()
     const instructions = await prepareInstructions(sql)
 
-    for(const {id, ts} of oids) {
+    for(const {orderId, ts} of oids) {
+        await delay()
         try {
-            //const { sum, count } = await getSumAndCount(session, id)
-            //if(!(sum === count || ts.getTime() < previous.getTime())) continue
-            await deliverOrder(sql, {orderId: id}, instructions, ctx)
-            ok.push(Number(id))
+            if(ttl && ts.getTime() > previous.getTime()) continue
+            await deliverOrder(sql, { orderId }, instructions, ctx)
+            ok.push(Number(orderId))
         }
         catch(err){
             console.log('delivery error', err)
-            await sendErrorMessage(Number(id), err)
+            await sendErrorMessage(Number(orderId), err)
         }
     }
 }
 
 export const campaignByOrder = async (sql: QueryClient, orderId: Uint64 | bigint = TEST_ORDER_ID) => {
-    const [ [ row ] ] = await sql`select distinct campaign_id, order_id from ordered_items where order_id = ${orderId}`
-    const { campaign_id, order_id } = row as { campaign_id: Uint64  | bigint, order_id:  Uint64  | bigint }
+    const oid64 = typeof orderId === 'bigint' ? new Uint64(orderId) : orderId
+    const [ [ row ] ] = await sql`select distinct campaign_id, order_id from ordered_items where order_id = ${oid64}`
+    const { campaign_id, order_id } = row as { campaign_id: bigint, order_id: bigint }
     return [ campaign_id, order_id ]
 }
 
-type OrderWithGoods = { orderId: Uint64 | bigint, goods?: Map<string, string[]> }
+type OrderWithGoods = { orderId: bigint, goods?: Map<string, string[]> }
 
 export const deliverOrder = async (sql: QueryClient, order: OrderWithGoods, instructions: string[], ctx?: Context) => {
 
@@ -84,7 +101,7 @@ export const deliverOrder = async (sql: QueryClient, order: OrderWithGoods, inst
     })
     
     const reply = await deliverItems(Number(campaignId), Number(orderId), goods)
-    if(typeof reply === 'boolean' && reply) await sql`update ordered_items set fulfilled_at = ${new Datetime(new Date)} where order_id = ${orderId}`
+    if(typeof reply === 'boolean' && reply) await sql`update ordered_items set fulfilled_at = ${new Datetime(new Date)} where order_id = ${new Uint64(orderId)}`
     else throw `Маркет не принял товары: ${JSON.stringify(reply)}`
 
     const withChat = hasFake(goodsMap)
@@ -135,17 +152,21 @@ export const prepareGoods = async (sql: QueryClient, orderId: Uint64 | bigint = 
 
     const codesByOffer = new Map<string, string[]>()
 
-    await sql`update codes set order_id = null where order_id = ${orderId}`
+    const oid64 = typeof orderId === 'bigint' ? new Uint64(orderId) : orderId
+
+    await sql`update codes set order_id = null where order_id = ${oid64}`
+
+    const emoji = `⌛⏳⌚⏰⏱️⏲️🕰️🕛🕧🕐🕜🕑🕝🕒🕞🕓🕟🕔🕠🕕🕡🕖🕢🕗🕣🕘🕤🕙🕥🕚`
 
     for(const { count, offerId } of items){
-        const codes = new Array<string>(count).fill(fakeCode)
+        const codes = new Array<string>(count).fill(fakeCode).map((el, i) => `${emoji.charAt(i)} ${el}`)
         for(let i = 0; i < count; i++){
             await delay()
             const [ [ row ] ] = await sql`select code from codes where order_id is null and offer_id = ${offerId} limit 1`
             if(!row) break
             const { code } = row as { code: string }
             codes[i] = code
-            await sql `update codes set order_id = ${orderId} where code = ${code}`
+            await sql `update codes set order_id = ${oid64} where code = ${code}`
         }
         codesByOffer.set(offerId, codes)
     }
@@ -169,7 +190,7 @@ export const restoreItems = async (sql: QueryClient, orderId: Uint64 | BigInt = 
 export const insertTestingData = async (sql: QueryClient) => {
     await sql`
         insert into codes (code, offer_id, user, created_at) values 
-            ('qwerty12345',	'APPLE500', 1234567, Datetime('2025-10-22T08:38:46Z')),
+            ('qwerty12345',	'APPLE500', 1234567, Datetime('2025-10-14T08:38:46Z')),
             ('qwerty12346',	'APPLE500', 1234567, Datetime('2025-10-14T14:40:09Z')),
             ('qwerty12347',	'APPLE500', 1234567, Datetime('2025-10-14T14:40:09Z')),
             ('qwerty12348',	'APPLE500', 1234567, Datetime('2025-10-14T14:40:09Z')),

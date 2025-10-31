@@ -3,7 +3,7 @@ import { query } from '@ydbjs/query'
 import { Uint64 } from '@ydbjs/value/primitive'
 import { expect, describe, it, beforeAll, afterAll } from 'vitest'
 import { getRemoteDriver } from './ydb/index.js'
-import { createTables, insertTestingData } from './delivery.service.js'
+import { createTables, insertTestingData } from './delivery.js'
 
 let driver: Driver | undefined = undefined
 

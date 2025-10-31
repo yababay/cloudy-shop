@@ -1,5 +1,6 @@
 import { Driver } from '@ydbjs/core'
 import { query } from '@ydbjs/query'
+import { Datetime, Uint64 } from '@ydbjs/value/primitive'
 import { expect, describe, it, beforeAll, afterAll } from 'vitest'
 import { getDriver } from './ydb/index.js'
 import { campaignByOrder, createTables, FAKE_CODE, getSumAndCount, hasFake, insertInstructions, insertTestingData, prepareGoods, prepareInstructions, restoreItems, TEST_CAMPAIGN_ID } from './delivery.js'
@@ -7,7 +8,53 @@ import { activateTill } from '../util/date.js'
 
 let driver: Driver | undefined = undefined
 
-describe('Campaign id', async () => {
+describe('Order id', async () => {
+  it('should be correct', async () => {
+      if(!driver) throw 'no driver'
+      const sql = query(driver)
+      const [ [ row ] ] = await sql`select order_id from ordered_items limit 1`
+      const { order_id } = row as { order_id: Uint64 | bigint }
+      expect(order_id).toBeTypeOf('bigint')
+  })
+
+  beforeAll(async () => {
+    driver = await getDriver()
+    const sql = query(driver)
+    await createTables(sql)
+    await insertTestingData(sql)
+  })
+
+  afterAll(() => {if(driver) driver.close()})
+
+})
+
+describe.skip('Datetime', async () => {
+    it('should be correct', async () => {
+        const dt = new Datetime(new Date)
+        expect(dt).toBeTypeOf('object')
+        if(!driver) throw 'no driver'
+        const sql = query(driver)
+        const [ [ row ] ] = await sql`select created_at from codes limit 1`
+        const { created_at } = row as { created_at: Datetime }
+        expect(created_at).toBeTypeOf('object')
+        const ts = new Date(created_at.toString())
+        expect(ts.getFullYear()).toBe(2025)
+        expect(ts.getMonth()).toBe(9)
+        expect(ts.getDate()).toBe(14)
+    })
+
+    beforeAll(async () => {
+      driver = await getDriver()
+      const sql = query(driver)
+      await createTables(sql)
+      await insertTestingData(sql)
+    })
+  
+    afterAll(() => {if(driver) driver.close()})
+  
+  })
+
+describe.skip('Campaign id', async () => {
 
   it('should be correct', async () => {
       if(!driver) throw 'no driver'

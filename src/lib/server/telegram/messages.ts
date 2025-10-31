@@ -47,7 +47,7 @@ export const sendOrderDeliveredMessage = async (orderId: number) => {
 }
 
 export const sendErrorMessage = async (orderId: number | string, err: unknown) => {
-    if(typeof err !== 'string') err = JSON.stringify(err)
+    if(typeof err !== 'string') err = JSON.stringify(err).slice(0, 100)
     let message = `❌ При обработке заказа № ${orderId} произошла ошибка: ${err}.`
     await sendMessage(message)
 }
