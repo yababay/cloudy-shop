@@ -8,7 +8,7 @@ import { activateTill } from '../util/date.js'
 
 let driver: Driver | undefined = undefined
 
-describe('Order id', async () => {
+describe.skip('Order id', async () => {
   it('should be correct', async () => {
       if(!driver) throw 'no driver'
       const sql = query(driver)

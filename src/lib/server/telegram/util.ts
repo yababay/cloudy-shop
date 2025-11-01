@@ -26,8 +26,7 @@ export const REPLY = {
 
 export const parsePayload = (context: YC.CloudFunctionsHttpContext) => {    
     let payload: string = context.getPayload()
-    if(typeof payload !== 'string') throw 'bad telegram context'
-    payload = JSON.parse(payload)
+    if(typeof payload === 'string') payload = JSON.parse(payload)
     const ctx = Reflect.construct(Context, [payload, TG, BOT_INFO]) as Context
     const { text, message, callbackQuery } = ctx
     const data = Reflect.get(callbackQuery || {}, 'data') as string | undefined

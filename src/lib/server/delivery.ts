@@ -37,10 +37,10 @@ export const delivery = async (event: YC.CloudFunctionsHttpEvent, context: YC.Cl
 }
 
 export const getSumAndCount = async (sql: QueryClient, orderId: Uint64 | bigint = TEST_ORDER_ID, fakeCode = FAKE_CODE) => {
-    const goods = await prepareGoods(sql, orderId)
+    const goods = await prepareGoods(sql, orderId, fakeCode)
     const codes = Array.from(goods.values()).reduce((acc, arr: string[]) => [ ...acc, ...arr], [])
     const sum = codes.length
-    const count = codes.filter(el => el !== fakeCode).length
+    const count = codes.filter(el => el.indexOf(fakeCode) > -1).length
     return { count, sum, goods }
 }
 
@@ -223,6 +223,16 @@ export const insertInstructions = async (sql: QueryClient) => {
     `
 }
 
+export const getOffers = () => {
+    const arr = new Array<number>()
+    let id = 500
+    while(id <= 9000) {
+        arr.push(id)
+        id += 50
+    }
+    return arr.map(id => `APPLE${id}`)
+}
+  
 export const createTables = async (sql: QueryClient) => {
     await sql`
       DROP TABLE IF EXISTS codes;

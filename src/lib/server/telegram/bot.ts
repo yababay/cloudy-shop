@@ -12,6 +12,7 @@ const HZ = '🤔'
 export const telegram = async (event: YC.CloudFunctionsHttpEvent, context: YC.CloudFunctionsHttpContext) => {
     
     const { ctx, text, data, uid } = parsePayload(context)
+
     if(text && await plainTextOutput(text, ctx)) return REPLY
 
     let driver: Driver | undefined = undefined
