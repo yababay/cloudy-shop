@@ -1,8 +1,11 @@
 import type { QueryClient } from '@ydbjs/query'
 import { Markup, type Context } from 'telegraf'
-import { deliverAll, deliverOrder, FAKE_CODE, getSumAndCount, prepareInstructions } from '../delivery.js'
+import { deliverAll, deliverOrder, FAKE_CODE, getFakeCode, getSumAndCount, prepareInstructions } from '../delivery.js'
 
 export const parseActions = async (sql: QueryClient, data: string, ctx: Context) => {
+
+    console.log(`data`, data)
+
     switch(data){
         
         case 'deliver':
@@ -15,7 +18,8 @@ export const parseActions = async (sql: QueryClient, data: string, ctx: Context)
 
         default:
             if(!/^\d+$/.test(data)) return false
-            await showSingle(sql, +data, ctx)
+            const fakeCode = await getFakeCode(sql)
+            await showSingle(sql, +data, fakeCode, ctx)
     }
     return true
 }
@@ -25,11 +29,13 @@ export const parseCommands = async (sql: QueryClient, text: string, ctx: Context
     switch(text) {
 
         case '/check':
+        case '/orders':
             const oids = await findUnfulfilled(sql)
             if(!oids.length) await ctx.reply(`🤔 Неотправленных заказов не обнаружено`)
             else if(oids.length === 1){
                 const [ oid ] = oids
-                await showSingle(sql, oid, ctx)
+                const fakeCode = await getFakeCode(sql)
+                await showSingle(sql, oid, fakeCode, ctx)
                 return true
             }
             else await ctx.reply(`Неотправленные заказы:`, Markup.inlineKeyboard(
@@ -53,8 +59,8 @@ export const parseCommands = async (sql: QueryClient, text: string, ctx: Context
     return false
 }
 
-const showSingle = async (sql: QueryClient, oid: number, ctx: Context) => {
-    const { sum, count, goods } = await getSumAndCount(sql)
+const showSingle = async (sql: QueryClient, oid: number, fakeCode: string, ctx: Context) => {
+    const { sum, count, goods } = await getSumAndCount(sql, BigInt(oid), fakeCode)
     if(sum === count){
         const instructions = await prepareInstructions(sql)
         await deliverOrder(sql, { orderId: BigInt(oid), goods}, instructions, ctx)
@@ -63,10 +69,10 @@ const showSingle = async (sql: QueryClient, oid: number, ctx: Context) => {
     let message = `В заказе № ${Number(oid)} заполнено ${count} кодов из ${sum}:\n\n`
     message += Array.from(goods.entries()).map(([offer, codes]) => {
         const { length } = codes
-        const count = codes.filter(el => el.indexOf(FAKE_CODE) > -1).length
-        return `<code>${offer}</code>: ${count} из ${length}`
-    }).join('\n\n')
-    await ctx.reply(message)
+        const count = codes.filter(el => el.indexOf(fakeCode) > -1).length
+        return count === 0 ? '' : `<code>${offer}</code>: добавьте еще ${count}, чтобы стало ${length}`
+    }).filter(el => !!el).join('\n\n')
+    await ctx.reply(message, {parse_mode: 'HTML'})
 }
 
 const findUnfulfilled = async (sql: QueryClient) => {

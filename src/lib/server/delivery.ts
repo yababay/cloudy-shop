@@ -14,6 +14,13 @@ import { sendDeliveryMessage } from './telegram/messages.js'
 
 const converter = new showdown.Converter()
 
+export const getFakeCode = async (sql: QueryClient) => {
+    const [ [ row ] ] = await sql`select value as fakeCode from settings where key = 'FAKE_CODE'`
+    const { fakeCode } = row as { fakeCode: string }
+    if(!fakeCode) throw 'no fake code in settings'
+    return fakeCode
+}
+
 export const delivery = async (event: YC.CloudFunctionsHttpEvent, context: YC.CloudFunctionsHttpContext) => {
     let payload = context.getPayload().toString() || 0
     if(!payload){
@@ -40,7 +47,7 @@ export const getSumAndCount = async (sql: QueryClient, orderId: Uint64 | bigint 
     const goods = await prepareGoods(sql, orderId, fakeCode)
     const codes = Array.from(goods.values()).reduce((acc, arr: string[]) => [ ...acc, ...arr], [])
     const sum = codes.length
-    const count = codes.filter(el => el.indexOf(fakeCode) > -1).length
+    const count = codes.filter(el => el.indexOf(fakeCode) === -1).length
     return { count, sum, goods }
 }
 
@@ -90,7 +97,10 @@ export const deliverOrder = async (sql: QueryClient, order: OrderWithGoods, inst
 
     const FULL_INSTRUCTION = `${HOLIDAY_INSTRUCTION}\n\n${ACTIVATION_INSTRUCTION}`
 
-    const goodsMap = order.goods || await prepareGoods(sql, orderId, FAKE_CODE)
+    let goodsMap = order.goods || await prepareGoods(sql, orderId, FAKE_CODE)
+
+    console.log('goods map', goodsMap)
+
     const activate_till = activateTill()
     const items = await restoreItems(sql, orderId)
 

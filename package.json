@@ -4,6 +4,9 @@
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build && npm run prepack",
+		"git:local": "read -p 'Суть коммита: ' COMMIT; git add . ; git commit -am $COMMIT",
+		"git:remote": "git push origin functions",
+		"git": "npm run git:local && npm run git:remote",
 		"ydb:start": "./scripts/ydb-start.sh ram",
 		"ydb:stop": "./scripts/ydb-stop.sh",
 		"upload:delivery": "npm run build && ./scripts/upload.sh delivery",
