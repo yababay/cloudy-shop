@@ -20,21 +20,38 @@ export const parseCodes = async (sql: QueryClient, text: string, uid: number, ct
         return true
     }
 
-    let codes = text.trim()
-        .split(/[\r\n]+/)
-        .map(row => row.split(/\s+/))
-    
-    let { length } = codes
+    let currentOffer: string | undefined = undefined
 
     const [ rows ] = await sql`select id from offers`
     const offers = rows.map(row => {
         const { id } = row as { id: string }
         return id
     }) 
+
+    let lines = text.trim().split(/[\r\n]+/)
+
+    let [ line ] = lines
+
+    if(!line || !offers.includes(line.trim())) return false
+
+
+    let codes = text.trim()
+        .split(/[\r\n]+/)
+        .map(row => row.split(/\s+/))
+        .map(([s]) => s.trim())
+        .filter(s => !!s)
+        .reduce((acc, s) => {
+            if(offers.includes(s)){
+                currentOffer = s
+                return acc
+            }
+            if(!currentOffer) throw 'no current offer'
+            return [...acc, [currentOffer, s] ]
+        }, new Array<string[]>())
     
-    codes = codes.filter(([ offer, code ]) => offers.includes(offer) && code)
+    let { length } = codes
     
-    if(!codes.length) return false
+    if(!length) return false
 
     let success = 0
 

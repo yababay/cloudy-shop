@@ -25,7 +25,7 @@ function upload {
     yc serverless function version create \
       --runtime nodejs22 \
       --memory 256m \
-      --execution-timeout 15s \
+      --execution-timeout 35s \
       --source-path ./build/func.zip \
       --service-account-id="$YC_ACCOUNT_ID" \
       --folder-id $YC_FOLDER_ID \

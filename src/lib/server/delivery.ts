@@ -166,10 +166,14 @@ export const prepareGoods = async (sql: QueryClient, orderId: Uint64 | bigint = 
 
     await sql`update codes set order_id = null where order_id = ${oid64}`
 
-    const emoji = `⌛⏳⌚⏰⏱️⏲️🕰️🕛🕧🕐🕜🕑🕝🕒🕞🕓🕟🕔🕠🕕🕡🕖🕢🕗🕣🕘🕤🕙🕥🕚`
-
+    const emoji = Array.from(new Set<string>([
+        '🕛', '🕧', '🕐', '🕜', '🕑', '🕝', '🕒', '🕞', '🕓', '🕟', '🕔', '🕠', '🕕', '🕡', '🕖', '🕢', '🕗', '🕣', 
+        '🕘', '🕤', '🕙', '🕥', '🕚', '🕦', '⌛️', '⏳', '⌚️', '⏱️', '⏲️', '🕰', '⏰', '⏱️', 
+        '✔️', '✅', '❎', '🟩', '🟦', '🟧', '🟥', '🟪', '🟫', '⬛️', '⬜️', '🌲', '🌴', '🌳', '🌵', '🏝', '🌿', '☘️', '🍀', '🍁', '🍂', '🍃', '🌱', '✨', '⭐️', '🚀', '🌌', '📡', '💻', '💿', '📀', '💽', '📸', '⚡️', '🌀', '🍥', '🥢', '🥁', '🎸', '🎺', '🎷', '🪗', '🎹', '🎵', '🪇', '🎼', '🌠', '🌍', '🧭', '✈️'
+    ]))
+    
     for(const { count, offerId } of items){
-        const codes = new Array<string>(count).fill(fakeCode).map((el, i) => `${emoji.charAt(i)} ${el}`)
+        const codes = new Array<string>(count).fill(fakeCode).map((el, i) => `${emoji[i]} ${el}`)
         for(let i = 0; i < count; i++){
             await delay()
             const [ [ row ] ] = await sql`select code from codes where order_id is null and offer_id = ${offerId} limit 1`
