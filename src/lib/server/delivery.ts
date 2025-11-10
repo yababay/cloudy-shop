@@ -99,8 +99,6 @@ export const deliverOrder = async (sql: QueryClient, order: OrderWithGoods, inst
 
     let goodsMap = order.goods || await prepareGoods(sql, orderId, FAKE_CODE)
 
-    console.log('goods map', goodsMap)
-
     const activate_till = activateTill()
     const items = await restoreItems(sql, orderId)
 
@@ -114,11 +112,13 @@ export const deliverOrder = async (sql: QueryClient, order: OrderWithGoods, inst
     if(typeof reply === 'boolean' && reply) await sql`update ordered_items set fulfilled_at = ${new Datetime(new Date)} where order_id = ${new Uint64(orderId)}`
     else throw `Маркет не принял товары: ${JSON.stringify(reply)}`
 
-    const withChat = hasFake(goodsMap)
+    const withChat = hasFake(goodsMap, FAKE_CODE)
+
+    console.log('withChat', withChat)
 
     if(withChat) {
         const businessId = await getBusinessId(Number(campaignId))
-        await openChat(businessId, Number(orderId), CHAT_FIRST_MESSAGE)
+        const chatIt = await openChat(businessId, Number(orderId), CHAT_FIRST_MESSAGE)
     }
 
     await sendDeliveryMessage(Number(orderId), withChat ? chatUrl : '', ctx)
@@ -151,7 +151,7 @@ export const prepareInstructions = async (sql: QueryClient) => {
 
 export const hasFake = (goods: Map<string, string[]>, fakeCode = FAKE_CODE) => {
     for(const [_, codes] of goods.entries()){
-        if(codes.includes(fakeCode)) return true
+        for(const code of codes) if(code.indexOf(fakeCode) > -1) return true
     }
     return false
 } 
