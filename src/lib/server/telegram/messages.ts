@@ -36,7 +36,7 @@ export const sendOrderCreatedMessage = async (orderId: number) => {
 
 export const sendDeliveryMessage = async (orderId: number | string, chat: string, ctx?:  Context) => {
     let message = `📨 Заказ № ${orderId} отправлен Яндекс-маркету.`
-    if(chat) message += ` Предоставьте недостающие коды [в чате](${chat})`
+    if(chat) message += ` Предоставьте недостающие коды [в чате](${chat}).`
     if(ctx)  await ctx.reply(message, {parse_mode: 'Markdown'})
     else await sendMessage(message)
 }

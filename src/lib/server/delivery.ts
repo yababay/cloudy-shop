@@ -99,22 +99,22 @@ export const deliverOrder = async (sql: QueryClient, order: OrderWithGoods, inst
 
     let goodsMap = order.goods || await prepareGoods(sql, orderId, FAKE_CODE)
 
+    const withChat = hasFake(goodsMap, FAKE_CODE)
+
     const activate_till = activateTill()
     const items = await restoreItems(sql, orderId)
 
     const goods: OrderDigitalItemDTO[] = items.map(({id, offerId}) => {
         const codes = goodsMap.get(offerId)
         if(!codes) throw 'no codes'
-        return { id, codes, activate_till, slip: codes.includes(FAKE_CODE) ? FULL_INSTRUCTION : ACTIVATION_INSTRUCTION }
+        return { id, codes, activate_till, slip: codes.reduce((acc, code) => acc || code.includes(FAKE_CODE), false) ? FULL_INSTRUCTION : ACTIVATION_INSTRUCTION }
     })
     
     const reply = await deliverItems(Number(campaignId), Number(orderId), goods)
     if(typeof reply === 'boolean' && reply) await sql`update ordered_items set fulfilled_at = ${new Datetime(new Date)} where order_id = ${new Uint64(orderId)}`
     else throw `Маркет не принял товары: ${JSON.stringify(reply)}`
 
-    const withChat = hasFake(goodsMap, FAKE_CODE)
-
-    console.log('withChat', withChat)
+//    console.log('withChat', withChat)
 
     if(withChat) {
         const businessId = await getBusinessId(Number(campaignId))
